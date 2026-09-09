@@ -60,7 +60,7 @@ abstract class FutureBase[+T] extends Future[T] {
       if (pf.isDefinedAt(t)) p.success(pf(t))
       else p.failure(t)
     } catch {
-      case NonFatal(pft) => p failure pft
+      case NonFatal(pft) => p `failure` pft
     }
   }
 
@@ -73,7 +73,7 @@ abstract class FutureBase[+T] extends Future[T] {
         case NonFatal(e) => p.failure(e)
       }
     } catch {
-      case NonFatal(e) => p failure e
+      case NonFatal(e) => p `failure` e
     }
   }
 
@@ -113,12 +113,12 @@ private[solrs] object FutureFactory {
     *  Implemented not directly in class FutureFactory because this would be impossible to be implemented
     *  by a java FutureFactory.
     */
-  def sequence[A, M[_] <: TraversableOnce[_], X[_]](in: M[Future[A]])
+  def sequence[A, M[_] <: TraversableOnce[?], X[_]](in: M[Future[A]])
                                              (implicit cbf: CanBuildFrom[M[Future[A]], A, M[A]],
                                               futureFactory: FutureFactory[X]): Future[M[A]] = {
     in.foldLeft(futureFactory.successful(cbf(in))) { (fr, fa) =>
       for (r <- fr; a <- fa.asInstanceOf[Future[A]]) yield r += a
-    } map (_.result())
+    }.map(_.result())
   }
 
 }

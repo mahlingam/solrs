@@ -11,7 +11,7 @@ import io.ino.solrs.ServerStateChangeObservable.StateChange
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.JavaFutureFactory
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.client.solrj.request.QueryRequest
@@ -42,7 +42,7 @@ trait SolrServers {
   /**
     * Determines Solr servers matching the given solr request (e.g. based on the "collection" param).
     */
-  def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]]
+  def matching(r: SolrRequest[?]): Try[IndexedSeq[SolrServer]]
 
   /**
     * Determines the shard replica which is the shard leader.
@@ -52,7 +52,7 @@ trait SolrServers {
 }
 
 class StaticSolrServers(override val all: IndexedSeq[SolrServer]) extends SolrServers {
-  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = Success(all)
+  override def matching(r: SolrRequest[?]): Try[IndexedSeq[SolrServer]] = Success(all)
 }
 object StaticSolrServers {
   def apply(baseUrls: IndexedSeq[String]): StaticSolrServers =
@@ -137,7 +137,7 @@ class CloudSolrServers[F[_]](
   private val scheduledExecutor: ScheduledExecutorService =
     Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
-  private var asyncSolrClient: AsyncSolrClient[F] = _
+  private var asyncSolrClient: AsyncSolrClient[F] = scala.compiletime.uninitialized
 
   override def setAsyncSolrClient(client: AsyncSolrClient[F]): Unit = {
     asyncSolrClient = client
@@ -292,7 +292,7 @@ class CloudSolrServers[F[_]](
     * it should start from the first one again. When the known solr servers change,
     * the iterator must reflect this.
     */
-  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = {
+  override def matching(r: SolrRequest[?]): Try[IndexedSeq[SolrServer]] = {
     val params = r.getParams
 
     val collection = Option(params.get("collection")).orElse(defaultCollection).map(_.split(",")(0)).getOrElse(
@@ -394,14 +394,13 @@ object CloudSolrServers {
                                                             servers: IndexedSeq[ShardReplica])
 
   private[solrs] def getCollections(clusterState: ClusterState): Map[String, CollectionInfo] = {
-    import scala.jdk.CollectionConverters._
-
-    clusterState.getCollectionsMap.asScala.foldLeft(
+    import scala.jdk.StreamConverters._
+    clusterState.collectionStream().toScala(LazyList).foldLeft(
       Map.empty[String, CollectionInfo]
     ) {
-      case (res, (name, collection)) =>
+      case (res, collection) =>
         val servers = mapSliceReplicas(collection.getSlices)(repl => ShardReplica(repl.getCoreUrl, repl)).toIndexedSeq
-        res.updated(name, CollectionInfo(collection, servers))
+        res.updated(collection.getName, CollectionInfo(collection, servers))
     }
   }
 
@@ -486,7 +485,7 @@ class ReloadingSolrServers[F[_]](
     * it should start from the first one again. When the known solr servers change,
     * the iterator must reflect this.
     */
-  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = Success(solrServers)
+  override def matching(r: SolrRequest[?]): Try[IndexedSeq[SolrServer]] = Success(solrServers)
 
   def reload(): F[IndexedSeq[SolrServer]] = {
     val f = loadUrl().map { data =>

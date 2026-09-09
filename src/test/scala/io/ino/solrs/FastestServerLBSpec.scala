@@ -5,7 +5,7 @@ import io.ino.solrs.Fixtures.shardReplica
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
 import io.ino.time.Clock.MutableClock
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.request.UpdateRequest
@@ -73,7 +73,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     it("should return a Failure if no solr server matches") {
       val nonMatchingServers = new SolrServers {
         override def all: Seq[SolrServer] = Nil
-        override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] =
+        override def matching(r: SolrRequest[?]): Try[IndexedSeq[SolrServer]] =
           Success(Vector.empty)
       }
       val cut = newDynamicLB(nonMatchingServers, q, clock)

@@ -1,7 +1,7 @@
 package io.ino.solrs
 
 import io.ino.solrs.Fixtures.shardReplica
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.request.UpdateRequest
@@ -28,7 +28,7 @@ class RoundRobinLBSpec extends AnyFunSpec with Matchers {
     it("should return None if no solr server matches") {
       val nonMatchingServers = new SolrServers {
         override def all: Seq[SolrServer] = Nil
-        override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = Success(Vector.empty)
+        override def matching(r: SolrRequest[?]): Try[IndexedSeq[SolrServer]] = Success(Vector.empty)
       }
       val cut = RoundRobinLB(nonMatchingServers)
 

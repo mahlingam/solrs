@@ -3,7 +3,7 @@ package io.ino.solrs
 import io.ino.solrs.LoadBalancer.NoSolrServersAvailableException
 import io.ino.solrs.RetryPolicy._
 import io.ino.solrs.RetryDecision.Result
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.scalatest.funspec.AnyFunSpec
@@ -31,7 +31,7 @@ class RetryPolicySpec extends AnyFunSpec with Matchers with Inside {
 
     it("should not retry when no servers available") {
       val lb = new LoadBalancer {
-        override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = Failure(NoSolrServersAvailableException(Nil))
+        override def solrServer(r: SolrRequest[?], preferred: Option[SolrServer] = None): Try[SolrServer] = Failure(NoSolrServersAvailableException(Nil))
         override val solrServers = new StaticSolrServers(IndexedSeq.empty)
       }
       val retry = TryAvailableServers.shouldRetry(e, server1, RequestContext(q), lb)

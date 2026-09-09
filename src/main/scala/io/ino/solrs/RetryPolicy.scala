@@ -18,7 +18,7 @@ abstract class RetryPolicy {
    * @param requestContext The context of the request initiated by the client, e.g. provides the servers already tried
    * @param lb The configured load balancer 
    */
-  def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): RetryDecision
+  def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[?], lb: LoadBalancer): RetryDecision
 }
 
 /**
@@ -55,7 +55,7 @@ object RetryPolicy {
    * Don't retry, propagate the first failure.
    */
   val TryOnce: RetryPolicy = new RetryPolicy {
-    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): StandardRetryDecision = RetryDecision.Fail
+    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[?], lb: LoadBalancer): StandardRetryDecision = RetryDecision.Fail
   }
 
   /**
@@ -64,7 +64,7 @@ object RetryPolicy {
    */
   val TryAvailableServers: RetryPolicy = new RetryPolicy {
 
-    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): RetryDecision = {
+    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[?], lb: LoadBalancer): RetryDecision = {
 
       val countServers = lb.solrServers.all.length
       val preferred = requestContext.preferred.flatMap(p =>
@@ -96,7 +96,7 @@ object RetryPolicy {
    * Retries the given number of times.
    */
   def AtMost(times: Int): RetryPolicy = new RetryPolicy {
-    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): RetryDecision = {
+    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[?], lb: LoadBalancer): RetryDecision = {
       if(requestContext.triedServers.length < times) RetryDecision.Retry
       else RetryDecision.Fail
     }

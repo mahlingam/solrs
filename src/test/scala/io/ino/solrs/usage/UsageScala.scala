@@ -8,7 +8,7 @@ class UsageScala1 {
   {
     import io.ino.solrs.AsyncSolrClient
     import io.ino.solrs.future.ScalaFutureFactory.Implicit
-    import org.apache.solr.client.solrj.SolrQuery
+    import org.apache.solr.client.solrj.request.SolrQuery
     import org.apache.solr.client.solrj.response.QueryResponse
     import scala.concurrent.ExecutionContext.Implicits.global
     import scala.concurrent.Future
@@ -34,8 +34,8 @@ class UsageScala1 {
     val logger = LoggerFactory.getLogger(getClass)
 
     val loggingInterceptor = new RequestInterceptor {
-      override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[_ <: T]) => Future[T])
-                                                      (solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
+      override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[? <: T]) => Future[T])
+                                                      (solrServer: SolrServer, r: SolrRequest[? <: T]): Future[T] = {
         val start = System.currentTimeMillis()
         f(solrServer, r).map { qr =>
           val requestTime = System.currentTimeMillis() - start
@@ -55,7 +55,7 @@ class UsageScalaTwitter1 {
 
   import io.ino.solrs.AsyncSolrClient
   import io.ino.solrs.future.TwitterFutureFactory.Implicit
-  import org.apache.solr.client.solrj.SolrQuery
+  import org.apache.solr.client.solrj.request.SolrQuery
   import org.apache.solr.client.solrj.response.QueryResponse
   import com.twitter.util.Future
 
@@ -73,7 +73,7 @@ class UsageScalaTwitter1 {
 class UsageScala2 {
   import io.ino.solrs.AsyncSolrClient
   import io.ino.solrs.future.ScalaFutureFactory.Implicit
-  import org.apache.solr.client.solrj.impl.XMLResponseParser
+  import org.apache.solr.client.solrj.response.XMLResponseParser
   import org.asynchttpclient.DefaultAsyncHttpClient
 
   val solr: AsyncSolrClient[Future] = AsyncSolrClient.Builder("http://localhost:8983/solr")

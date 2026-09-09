@@ -3,18 +3,13 @@ package io.ino.solrs
 import java.util
 import java.util.Optional
 import java.util.concurrent.CompletionStage
-
 import io.ino.solrs.AsyncSolrClient.Builder
 import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.JavaFutureFactory
 import org.apache.solr.client.solrj.SolrRequest.METHOD
 import org.apache.solr.client.solrj._
-import org.apache.solr.client.solrj.impl.BinaryRequestWriter
-import org.apache.solr.client.solrj.impl.BinaryResponseParser
-import org.apache.solr.client.solrj.request.RequestWriter
-import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.client.solrj.response.SolrPingResponse
-import org.apache.solr.client.solrj.response.UpdateResponse
+import org.apache.solr.client.solrj.request.{JavaBinRequestWriter, RequestWriter, SolrQuery}
+import org.apache.solr.client.solrj.response.{JavaBinResponseParser, QueryResponse, ResponseParser, SolrPingResponse, StreamingResponseCallback, UpdateResponse}
 import org.apache.solr.common.params.SolrParams
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.SolrDocumentList
@@ -42,8 +37,8 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
                           httpClient: AsyncHttpClient,
                           shutdownHttpClient: Boolean,
                           requestInterceptor: Option[RequestInterceptor] = None,
-                          requestWriter: RequestWriter = new BinaryRequestWriter,
-                          responseParser: ResponseParser = new BinaryResponseParser,
+                          requestWriter: RequestWriter = new JavaBinRequestWriter,
+                          responseParser: ResponseParser = new JavaBinResponseParser,
                           metrics: Metrics = NoopMetrics,
                           serverStateObservation: Option[ServerStateObservation[CompletionStage]] = None,
                           retryPolicy: RetryPolicy = RetryPolicy.TryOnce)
@@ -55,7 +50,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     * @param r the request to send to solr.
     * @return
     */
-  override def execute[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T]): CompletionStage[T] = super.execute(r)
+  override def execute[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[? <: T]): CompletionStage[T] = super.execute(r)
 
   /**
     * Performs a request to a solr server taking the preferred server into account if provided.
@@ -65,7 +60,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     *                  implementations have to support this and might add their own semantics.
     * @return the response and the server that handled the request.
     */
-  override def executePreferred[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T], preferred: Option[SolrServer]): CompletionStage[(T, SolrServer)] =
+  override def executePreferred[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[? <: T], preferred: Option[SolrServer]): CompletionStage[(T, SolrServer)] =
     super.executePreferred(r, preferred)
 
   /**
@@ -218,7 +213,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     * @param beans the collection of beans
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(beans: util.Collection[_]): CompletionStage[UpdateResponse] = super.addBeans(beans = beans.asScala)
+  def addBeans(beans: util.Collection[?]): CompletionStage[UpdateResponse] = super.addBeans(beans = beans.asScala)
 
   /**
     * Adds a collection of beans specifying max time before they become committed
@@ -229,7 +224,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     * @param commitWithinMs max time (in ms) before a commit will happen
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(beans: util.Collection[_], commitWithinMs: Int): CompletionStage[UpdateResponse] =
+  def addBeans(beans: util.Collection[?], commitWithinMs: Int): CompletionStage[UpdateResponse] =
     super.addBeans(beans = beans.asScala, commitWithinMs = commitWithinMs)
 
   /**
@@ -241,7 +236,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     * @param beans      the collection of beans
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(collection: String, beans: util.Collection[_]): CompletionStage[UpdateResponse] =
+  def addBeans(collection: String, beans: util.Collection[?]): CompletionStage[UpdateResponse] =
     super.addBeans(Option(collection), beans.asScala)
 
   /**
@@ -254,7 +249,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     * @param commitWithinMs max time (in ms) before a commit will happen
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(collection: String, beans: util.Collection[_], commitWithinMs: Int): CompletionStage[UpdateResponse] =
+  def addBeans(collection: String, beans: util.Collection[?], commitWithinMs: Int): CompletionStage[UpdateResponse] =
     super.addBeans(Option(collection), beans.asScala, commitWithinMs)
 
   /**
@@ -263,7 +258,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     * @param beanIterator the iterator which returns Beans
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(beanIterator: util.Iterator[_]): CompletionStage[UpdateResponse] = super.addBeans(beanIterator.asScala)
+  def addBeans(beanIterator: util.Iterator[?]): CompletionStage[UpdateResponse] = super.addBeans(beanIterator.asScala)
 
   /**
     * Adds the beans supplied by the given iterator.
@@ -272,7 +267,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     * @param beanIterator the iterator which returns Beans
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(collection: String, beanIterator: util.Iterator[_]): CompletionStage[UpdateResponse] =
+  def addBeans(collection: String, beanIterator: util.Iterator[?]): CompletionStage[UpdateResponse] =
     super.addBeans(collection, beanIterator.asScala)
 
   /**
@@ -772,8 +767,8 @@ object JavaAsyncSolrClient extends TypedAsyncSolrClient[CompletionStage, JavaAsy
 
   def create(url: String): JavaAsyncSolrClient = builder(url).build
 
-  override def builder(url: String): Builder[CompletionStage, JavaAsyncSolrClient] = new Builder(url, build _)
-  override def builder(loadBalancer: LoadBalancer): Builder[CompletionStage, JavaAsyncSolrClient] = new Builder(loadBalancer, build _)
+  override def builder(url: String): Builder[CompletionStage, JavaAsyncSolrClient] = new Builder(url, build)
+  override def builder(loadBalancer: LoadBalancer): Builder[CompletionStage, JavaAsyncSolrClient] = new Builder(loadBalancer, build)
 
   override protected def build(loadBalancer: LoadBalancer,
                                httpClient: AsyncHttpClient,

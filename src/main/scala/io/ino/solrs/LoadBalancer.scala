@@ -16,11 +16,9 @@ import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.JavaFutureFactory
 import io.ino.time.Clock
 import io.ino.time.Units.Millisecond
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.{QueryRequest, SolrQuery, UpdateRequest}
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
-import org.apache.solr.client.solrj.request.IsUpdateRequest
-import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -41,19 +39,19 @@ trait LoadBalancer extends RequestInterceptor {
   /**
    * Determines the solr server to use for a new request.
    */
-  def solrServer(r: SolrRequest[_], preferred: Option[SolrServer]): Try[SolrServer]
+  def solrServer(r: SolrRequest[?], preferred: Option[SolrServer]): Try[SolrServer]
 
   /**
    * Intercept the given request, allows implementations to monitor solr server performance.
    * This default implementation use invokes the request function.
    */
-  override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[_ <: T]) => Future[T])
-                                                  (solrServer: SolrServer, q: SolrRequest[_ <: T]): Future[T] = {
+  override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[? <: T]) => Future[T])
+                                                  (solrServer: SolrServer, q: SolrRequest[? <: T]): Future[T] = {
     f(solrServer, q)
   }
 
-  protected def isUpdateToLeader(r: SolrRequest[_], servers: IndexedSeq[SolrServer]): Boolean =
-    r.isInstanceOf[IsUpdateRequest] && r.asInstanceOf[IsUpdateRequest].isSendToLeaders && solrServers.findLeader(servers).isDefined
+  protected def isUpdateToLeader(r: SolrRequest[?], servers: IndexedSeq[SolrServer]): Boolean =
+    r.isInstanceOf[UpdateRequest] && r.asInstanceOf[UpdateRequest].isSendToLeaders && solrServers.findLeader(servers).isDefined
 
   def shutdown(): Unit = {
     // empty default
@@ -72,7 +70,7 @@ object LoadBalancer {
 class SingleServerLB(val server: SolrServer) extends LoadBalancer {
   def this(baseUrl: String) = this(SolrServer(baseUrl))
   private val someServer = Success(server)
-  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = someServer
+  override def solrServer(r: SolrRequest[?], preferred: Option[SolrServer] = None): Try[SolrServer] = someServer
   override val solrServers: SolrServers = new StaticSolrServers(IndexedSeq(server))
 }
 
@@ -88,7 +86,7 @@ class RoundRobinLB(override val solrServers: SolrServers,
     override def applyAsInt(operand: Int): Int = if (operand == Int.MaxValue) 0 else operand + 1
   }
 
-  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = solrServers.matching(r).flatMap { matching =>
+  override def solrServer(r: SolrRequest[?], preferred: Option[SolrServer] = None): Try[SolrServer] = solrServers.matching(r).flatMap { matching =>
     val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
       Failure(NoSolrServersAvailableException(matching))
@@ -186,7 +184,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
 
   import FastestServerLB._
 
-  private var client: AsyncSolrClient[F] = _
+  private var client: AsyncSolrClient[F] = scala.compiletime.uninitialized
 
   private val scheduler = Executors.newSingleThreadScheduledExecutor()
 
@@ -281,7 +279,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
   /**
    * Determines the solr server to use for a new request.
    */
-  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = solrServers.matching(r).flatMap { matching =>
+  override def solrServer(r: SolrRequest[?], preferred: Option[SolrServer] = None): Try[SolrServer] = solrServers.matching(r).flatMap { matching =>
     val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
       Failure(NoSolrServersAvailableException(matching))
@@ -298,8 +296,8 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
   /**
    * Intercept user queries to trigger test queries based on the current request rate.
    */
-  override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[_ <: T]) => Future[T])
-                             (solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
+  override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[? <: T]) => Future[T])
+                             (solrServer: SolrServer, r: SolrRequest[? <: T]): Future[T] = {
     val res = f(solrServer, r)
     // test each (fast) server matching the given query
     solrServers

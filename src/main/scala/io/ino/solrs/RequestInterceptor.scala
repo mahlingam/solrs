@@ -16,7 +16,7 @@ trait RequestInterceptor {
    * @param r the request to send to solr.
    * @return the solr response.
    */
-  def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[_ <: T]) => Future[T])
-                                         (solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T]
+  def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[? <: T]) => Future[T])
+                                         (solrServer: SolrServer, r: SolrRequest[? <: T]): Future[T]
 
 }

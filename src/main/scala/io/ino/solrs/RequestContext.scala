@@ -11,7 +11,7 @@ import scala.concurrent.duration.Duration
  * @param preferred the server that the user would like to use for the request
  * @param failedRequests information regarding failed requests
  */
-case class RequestContext[T <: SolrResponse](r: SolrRequest[_ <: T], preferred: Option[SolrServer] = None, failedRequests: Seq[RequestInfo] = Seq.empty) {
+case class RequestContext[T <: SolrResponse](r: SolrRequest[? <: T], preferred: Option[SolrServer] = None, failedRequests: Seq[RequestInfo] = Seq.empty) {
 
   def failedRequest(server: SolrServer, duration: Duration, e: Throwable): RequestContext[T] =
     copy(failedRequests = failedRequests :+ RequestInfo(server, duration, e))

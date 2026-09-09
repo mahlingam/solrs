@@ -90,7 +90,7 @@ object ShardReplica {
 
   private val replicaTypePattern = s"$SHARDS_PREFERENCE_REPLICA_TYPE:($NRT|$TLOG|$PULL)"r
 
-  private[solrs] def filterByShardPreference(r: SolrRequest[_], servers: IndexedSeq[SolrServer]): IndexedSeq[SolrServer] = {
+  private[solrs] def filterByShardPreference(r: SolrRequest[?], servers: IndexedSeq[SolrServer]): IndexedSeq[SolrServer] = {
     if (r.getParams == null || r.getParams.get(ShardParams.SHARDS_PREFERENCE) == null) servers
     else {
       r.getParams.get(ShardParams.SHARDS_PREFERENCE) match {

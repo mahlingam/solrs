@@ -11,27 +11,16 @@ import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
 import org.apache.commons.io.IOUtils
 import org.apache.solr.client.solrj.beans.DocumentObjectBinder
-import org.apache.solr.client.solrj.impl.BinaryRequestWriter
-import org.apache.solr.client.solrj.impl.BinaryResponseParser
-import org.apache.solr.client.solrj.impl.StreamingBinaryResponseParser
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.COMMIT
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.OPTIMIZE
-import org.apache.solr.client.solrj.request.QueryRequest
-import org.apache.solr.client.solrj.request.RequestWriter
-import org.apache.solr.client.solrj.request.SolrPing
-import org.apache.solr.client.solrj.request.UpdateRequest
-import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.client.solrj.response.SolrPingResponse
-import org.apache.solr.client.solrj.response.UpdateResponse
-import org.apache.solr.client.solrj.ResponseParser
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.{JavaBinRequestWriter, QueryRequest, RequestWriter, SolrPing, SolrQuery, UpdateRequest}
+import org.apache.solr.client.solrj.response.{JavaBinResponseParser, QueryResponse, ResponseParser, SolrPingResponse, StreamingJavaBinResponseParser, StreamingResponseCallback, UpdateResponse}
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrRequest.METHOD
 import org.apache.solr.client.solrj.SolrRequest.METHOD.GET
 import org.apache.solr.client.solrj.SolrRequest.METHOD.POST
 import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.SolrServerException
-import org.apache.solr.client.solrj.StreamingResponseCallback
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrException
@@ -62,15 +51,15 @@ object AsyncSolrClient {
     Option[RequestInterceptor], RequestWriter, ResponseParser, Metrics, Option[ServerStateObservation[F]], RetryPolicy) => ASC
 
   def apply[F[_]](baseUrl: String)(implicit futureFactory: FutureFactory[F]): AsyncSolrClient[F] =
-    new Builder(new SingleServerLB(baseUrl), ascFactory[F] _).build
+    new Builder(new SingleServerLB(baseUrl), ascFactory[F]).build
   def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: FutureFactory[F]): AsyncSolrClient[F] =
-    new Builder(loadBalancer, ascFactory[F] _).build
+    new Builder(loadBalancer, ascFactory[F]).build
 
   object Builder {
     def apply[F[_]](baseUrl: String)(implicit futureFactory: FutureFactory[F]) =
-      new Builder(baseUrl, ascFactory[F] _)
+      new Builder(baseUrl, ascFactory[F])
     def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: FutureFactory[F]) =
-      new Builder(loadBalancer, ascFactory[F] _)
+      new Builder(loadBalancer, ascFactory[F])
   }
 
   private[solrs] def ascFactory[F[_]](loadBalancer: LoadBalancer,
@@ -146,9 +135,9 @@ object AsyncSolrClient {
 
     protected def createHttpClient: AsyncHttpClient = new DefaultAsyncHttpClient()
 
-    protected def createRequestWriter: RequestWriter = new BinaryRequestWriter
+    protected def createRequestWriter: RequestWriter = new JavaBinRequestWriter
 
-    protected def createResponseParser: ResponseParser = new BinaryResponseParser
+    protected def createResponseParser: ResponseParser = new JavaBinResponseParser
 
     protected def createMetrics: Metrics = NoopMetrics
 
@@ -204,8 +193,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
                                        httpClient: AsyncHttpClient,
                                        shutdownHttpClient: Boolean,
                                        requestInterceptor: Option[RequestInterceptor] = None,
-                                       requestWriter: RequestWriter = new BinaryRequestWriter,
-                                       responseParser: ResponseParser = new BinaryResponseParser,
+                                       requestWriter: RequestWriter = new JavaBinRequestWriter,
+                                       responseParser: ResponseParser = new JavaBinResponseParser,
                                        metrics: Metrics = NoopMetrics,
                                        serverStateObservation: Option[ServerStateObservation[F]] = None,
                                        retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: FutureFactory[F]) {
@@ -271,7 +260,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     * @param r the request to send to solr.
     * @return
     */
-  def execute[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T]): F[T] = futureFactory.toBase[T](
+  def execute[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[? <: T]): F[T] = futureFactory.toBase[T](
     loadBalanceRequest(RequestContext[T](r)).map(_._1)
   )
 
@@ -282,7 +271,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     *                  implementations have to support this and might add their own semantics.
     * @return the response and the server that handled the request.
     */
-  def executePreferred[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T], preferred: Option[SolrServer]): F[(T, SolrServer)] =
+  def executePreferred[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[? <: T], preferred: Option[SolrServer]): F[(T, SolrServer)] =
     futureFactory.toBase[(T, SolrServer)](loadBalanceRequest(RequestContext[T](r, preferred)))
 
   /**
@@ -354,7 +343,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     * @param commitWithinMs max time (in ms) before a commit will happen
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(collection: Option[String] = None, beans: Iterable[_], commitWithinMs: Int = -1): F[UpdateResponse] =
+  def addBeans(collection: Option[String] = None, beans: Iterable[?], commitWithinMs: Int = -1): F[UpdateResponse] =
     addDocs(collection, beans.map(binder.toSolrInputDocument), commitWithinMs)
 
   /**
@@ -364,7 +353,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     * @param beanIterator the iterator which returns Beans
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(collection: String, beanIterator: Iterator[_]): F[UpdateResponse] =
+  def addBeans(collection: String, beanIterator: Iterator[?]): F[UpdateResponse] =
     addDocs(collection, beanIterator.map(binder.toSolrInputDocument))
 
   /**
@@ -373,7 +362,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     * @param beanIterator the iterator which returns Beans
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] from the server
     */
-  def addBeans(beanIterator: Iterator[_]): F[UpdateResponse] =
+  def addBeans(beanIterator: Iterator[?]): F[UpdateResponse] =
     addDocs(beanIterator.map(binder.toSolrInputDocument))
 
   /**
@@ -510,7 +499,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     *         from the server
     */
   def queryAndStreamResponse(collection: Option[String] = None, q: SolrParams, callback: StreamingResponseCallback): F[QueryResponse] = {
-    val parser = new StreamingBinaryResponseParser(callback)
+    val parser = new StreamingJavaBinResponseParser(callback)
     val req = new QueryRequest(queryParams(collection, Some(q)))
     req.setStreamingResponseCallback(callback)
     req.setResponseParser(parser)
@@ -557,7 +546,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     if (ids == null || ids.isEmpty) throw new IllegalArgumentException("Must provide an identifier of a document to retrieve.")
     val reqParams = queryParams(collection, params)
     if (isEmpty(reqParams.get(CommonParams.QT))) reqParams.set(CommonParams.QT, "/get")
-    reqParams.set("ids", ids.toArray: _*)
+    reqParams.set("ids", ids.toArray*)
     loadBalanceRequest(RequestContext(new QueryRequest(reqParams))).map(_._1).map(_.getResults)
   }
 
@@ -597,19 +586,18 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
       }
   }
 
-  private def execute[T <: SolrResponse : SolrResponseFactory](solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
-    val monitoredRequest = loadBalancer.interceptRequest[T](doExecute[T]) _
+  private def execute[T <: SolrResponse : SolrResponseFactory](solrServer: SolrServer, r: SolrRequest[? <: T]): Future[T] = {
+    val monitoredRequest = loadBalancer.interceptRequest[T](doExecute[T])
     requestInterceptor.map(ri =>
       ri.interceptRequest[T](monitoredRequest)(solrServer, r)
     ).getOrElse(monitoredRequest(solrServer, r))
   }
 
-  private[solrs] def doExecute[T <: SolrResponse](solrServer: SolrServer, r: SolrRequest[_ <: T])(implicit srf: SolrResponseFactory[T]): Future[T] = {
+  private[solrs] def doExecute[T <: SolrResponse](solrServer: SolrServer, r: SolrRequest[? <: T])(implicit srf: SolrResponseFactory[T]): Future[T] = {
 
     val wparams = new ModifiableSolrParams(r.getParams)
     if (responseParser != null && r.getResponseParser == null) {
       wparams.set(CommonParams.WT, responseParser.getWriterType)
-      wparams.set(CommonParams.VERSION, responseParser.getVersion)
     }
 
     implicit val s: SolrServer = solrServer
@@ -675,13 +663,13 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     promise.future
   }
 
-  protected def getPath(request: SolrRequest[_ <: SolrResponse]): String = {
-    val path = requestWriter.getPath(request)
+  protected def getPath(request: SolrRequest[? <: SolrResponse]): String = {
+    val path = request.getPath
     if (path != null && path.startsWith("/")) path else DEFAULT_PATH
   }
 
   @throws[RemoteSolrException]
-  protected def toSolrResponse[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T], response: Response, url: String, startTime: Long)(implicit server: SolrServer): T = {
+  protected def toSolrResponse[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[? <: T], response: Response, url: String, startTime: Long)(implicit server: SolrServer): T = {
     var rsp: NamedList[Object] = null
 
     withResponseParserFromRequest(r)(validateResponse(response, _))
@@ -714,7 +702,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   }
 
 
-  private def withResponseParserFromRequest[T <: SolrResponse, R](r: SolrRequest[_ <: T])(f:ResponseParser => R): R = {
+  private def withResponseParserFromRequest[T <: SolrResponse, R](r: SolrRequest[? <: T])(f:ResponseParser => R): R = {
     f(Option(r.getResponseParser).getOrElse(responseParser))
   }
 
@@ -725,7 +713,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     val httpStatus = response.getStatusCode
     if(httpStatus >= 400) {
       metrics.countRemoteException
-      val msg = responseParser.processResponse(response.getResponseBodyAsStream, getResponseEncoding(response)).get("error").asInstanceOf[NamedList[_]].get("msg")
+      val msg = responseParser.processResponse(response.getResponseBodyAsStream, getResponseEncoding(response)).get("error").asInstanceOf[NamedList[?]].get("msg")
       throw new RemoteSolrException(httpStatus, s"Server at ${server.baseUrl} returned non ok status:$httpStatus, message: ${response.getStatusText}, $msg", null)
     }
   }
@@ -761,12 +749,12 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     if (encoding == null) "UTF-8" else encoding
   }
 
-  protected def getErrorReason(url: String, rsp: NamedList[_], response: Response): String = {
+  protected def getErrorReason(url: String, rsp: NamedList[?], response: Response): String = {
     var reason: String = null
     try {
       val err = rsp.get("error")
       if (err != null) {
-        reason = err.asInstanceOf[NamedList[_]].get("msg").asInstanceOf[String]
+        reason = err.asInstanceOf[NamedList[?]].get("msg").asInstanceOf[String]
         // TODO? get the trace?
       }
     } catch {
@@ -799,8 +787,8 @@ trait TypedAsyncSolrClient[F[_], ASC <: AsyncSolrClient[F]] {
                       serverStateObservation: Option[ServerStateObservation[F]],
                       retryPolicy: RetryPolicy): ASC
 
-  def builder(baseUrl: String) = new Builder[F, ASC](new SingleServerLB(baseUrl), build _)
-  def builder(loadBalancer: LoadBalancer) = new Builder[F, ASC](loadBalancer, build _)
+  def builder(baseUrl: String) = new Builder[F, ASC](new SingleServerLB(baseUrl), build)
+  def builder(loadBalancer: LoadBalancer) = new Builder[F, ASC](loadBalancer, build)
 
 }
 
