@@ -101,11 +101,19 @@ paradoxMaterialTheme in Compile := {
     .withRepository(uri("https://github.com/inoio/solrs"))
 }
  */
+credentials ++= {
+  (sys.env.get("ARTIFACTORY_USERNAME"), sys.env.get("ARTIFACTORY_PASSWORD"), sys.env.get("ARTIFACTORY_URL")) match {
+    case (Some(user), Some(pass), Some(url)) =>
+      Seq(Credentials("Artifactory Realm", url, user, pass))
+    case _ =>
+      Seq.empty
+  }
+}
 
 // Publish settings
 ThisBuild / publishTo := {
-  val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
-  if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
+  if (isSnapshot.value)
+    Some("Springer JFrog Artifactory Snapshot Repository" at s"https://${sys.env("ARTIFACTORY_URL")}/springernature/libs-snapshot")
   else localStaging.value
 }
 
