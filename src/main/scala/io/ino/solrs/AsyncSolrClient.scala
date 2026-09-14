@@ -15,12 +15,10 @@ import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.COMMIT
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.OPTIMIZE
 import org.apache.solr.client.solrj.request.{JavaBinRequestWriter, QueryRequest, RequestWriter, SolrPing, SolrQuery, UpdateRequest}
 import org.apache.solr.client.solrj.response.{JavaBinResponseParser, QueryResponse, ResponseParser, SolrPingResponse, StreamingJavaBinResponseParser, StreamingResponseCallback, UpdateResponse}
-import org.apache.solr.client.solrj.SolrRequest
+import org.apache.solr.client.solrj.{SolrRequest, SolrResponse, SolrServerException}
 import org.apache.solr.client.solrj.SolrRequest.METHOD
 import org.apache.solr.client.solrj.SolrRequest.METHOD.GET
 import org.apache.solr.client.solrj.SolrRequest.METHOD.POST
-import org.apache.solr.client.solrj.SolrResponse
-import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrException

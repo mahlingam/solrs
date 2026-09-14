@@ -8,7 +8,7 @@ import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.response.JavaBinResponseParser.JAVABIN_CONTENT_TYPE
 import org.apache.solr.client.solrj.response.JavaBinResponseParser.JAVABIN_CONTENT_TYPE_V2
-import org.apache.solr.client.solrj.response.{InputStreamResponseParser, QueryResponse, ResponseParser, XMLResponseParser}
+import org.apache.solr.client.solrj.response.{QueryResponse, ResponseParser, XMLResponseParser}
 import org.apache.solr.client.solrj.request.{GenericSolrRequest, QueryRequest}
 import org.apache.solr.common.SolrException
 import org.apache.solr.common.util.NamedList
@@ -129,25 +129,13 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
       )
       request.setResponseParser(new ResponseParser() {
         override def getContentTypes  = new util.HashSet[String](asList("application/xml"))
-        def processResponse(reader: Reader): NamedList[AnyRef] = try {
-          val writer = new StringWriter
-          reader.transferTo(writer)
-          val output = writer.toString
-          val list = new NamedList
-          list.add("response", output)
-          list
-        } catch {
-          case e: IOException =>
-            throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "parsing error", e)
-        }
-
         @throws[IOException]
-        def processResponse(body: InputStream, encoding: String): NamedList[AnyRef] = {
+        override def processResponse(body: InputStream, encoding: String): NamedList[AnyRef] = {
           val writer = new StringWriter
           new InputStreamReader(body, if (encoding == null) "UTF-8"
           else encoding).transferTo(writer)
           val output = writer.toString
-          val list = new NamedList
+          val list = new NamedList[AnyRef]
           list.add("response", output)
           list
         }
